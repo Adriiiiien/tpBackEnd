@@ -12,8 +12,8 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
 // Configure le stockage des fichiers uploadés
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir), // Définit le dossier de destination
-  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)), // Renomme le fichier avec timestamp
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
 });
 
 // Filtre les fichiers autorisés (pdf, jpg, jpeg, png)
@@ -38,7 +38,25 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Route POST /contact : envoie l'email + accusé de réception et supprime le fichier temporaire
+// Fichier JSON pour l'historique
+const historyFile = path.join(__dirname, "history.json");
+
+// Fonction pour sauvegarder un envoi dans l'historique
+function saveEmailHistory({ email, subject, date, files }) {
+  let history = [];
+  if (fs.existsSync(historyFile)) {
+    try {
+      history = JSON.parse(fs.readFileSync(historyFile, "utf-8"));
+    } catch (err) {
+      console.error("Erreur lecture JSON:", err);
+    }
+  }
+
+  history.push({ email, subject, date, files });
+  fs.writeFileSync(historyFile, JSON.stringify(history, null, 2), "utf-8");
+}
+
+// Route POST /contact : envoie l'email + accusé de réception + historique
 router.post("/contact", upload.single("file"), async (req, res) => {
   try {
     const { name, email, message } = req.body;
@@ -53,12 +71,28 @@ router.post("/contact", upload.single("file"), async (req, res) => {
       attachments: file ? [{ filename: file.originalname, path: file.path }] : [],
     });
 
+    // Enregistre dans l'historique
+    saveEmailHistory({
+      email,
+      subject: "Nouveau message via formulaire de contact",
+      date: new Date().toISOString(),
+      files: file ? [file.originalname] : [],
+    });
+
     // Envoie un accusé de réception à l’expéditeur
     await transporter.sendMail({
       from: `"Support" <${process.env.SMTP_USER}>`,
       to: email,
       subject: "Accusé de réception - Votre message",
       text: `Bonjour ${name},\n\nMerci pour votre message, nous vous répondrons rapidement.\n\nCordialement,\nL'équipe.`,
+    });
+
+    // Historique pour l’accusé de réception
+    saveEmailHistory({
+      email,
+      subject: "Accusé de réception - Votre message",
+      date: new Date().toISOString(),
+      files: [],
     });
 
     // Supprime le fichier uploadé après envoi
@@ -71,4 +105,17 @@ router.post("/contact", upload.single("file"), async (req, res) => {
   }
 });
 
-module.exports = router; 
+// Route GET /contact/history : renvoie l'historique au format JSON
+router.get("/contact/history", (req, res) => {
+  let history = [];
+  if (fs.existsSync(historyFile)) {
+    try {
+      history = JSON.parse(fs.readFileSync(historyFile, "utf-8"));
+    } catch (err) {
+      console.error("Erreur lecture JSON:", err);
+    }
+  }
+  res.json(history);
+});
+
+module.exports = router;
