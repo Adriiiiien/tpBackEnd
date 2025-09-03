@@ -1,0 +1,18 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "email": "adriensimongaming@gmail.com",
+      "password": "$2b$10$7QxD4VxxevwL.S.t8X.SQeM7CtMORmxxT0bpB7om3UFC2a2CSOZuW",
+      "name": "Je Test"
+    }
+  ],
+  "resetTokens": [
+    {
+      "token": "3eea52ca746da647a8af6d1a97bb41c662f1f83dc49ff6313ba732764c648198",
+      "email": "adriensimongaming@gmail.com",
+      "expiresAt": 1756889303789,
+      "used": true
+    }
+  ]
+}
